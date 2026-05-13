@@ -322,12 +322,16 @@ svg.gauge{overflow:visible;display:block}
             <button class="btn" id="btnPkStop" disabled>&#9632; Stop</button>
             <button class="btn" id="btnPkClear">&#x2715; Löschen</button>
           </div>
-          <div style="margin-top:6px">
-            <button class="btn" id="btnPkDl" disabled style="width:100%">&#x2B07; Export peaks.csv</button>
+          <div style="margin-top:8px">
+            <div class="field" style="margin-bottom:6px">
+              <label for="pkFilename">Dateiname</label>
+              <input type="text" id="pkFilename" placeholder="euro_10ct" style="width:100%;box-sizing:border-box">
+            </div>
+            <button class="btn" id="btnPkDl" style="width:100%">&#x2B07; Download peaks.csv</button>
           </div>
           <p style="font-size:11px;color:var(--text3);margin-top:6px">
-            Jeder erkannte Peak wird als eine Zeile gespeichert: label;rp_min;l_min;delta_rp;delta_l;rp_avg;l_avg.<br>
-            Workflow: Start → Münzsorte mehrfach durch den Kanal → Stop → Datei als <span style="font-family:var(--mono)">euro_10ct_peaks.csv</span> speichern → wiederholen.
+            Jeder erkannte Peak wird als Zeile gespeichert: label;rp_min;l_min;delta_rp;delta_l;rp_avg;l_avg.<br>
+            Workflow: Start → Münzsorte mehrfach durch den Kanal → Stop → Dateiname eingeben → Download → Clear → nächste Sorte.
           </p>
         </div>
 
@@ -420,8 +424,10 @@ svg.gauge{overflow:visible;display:block}
             model.json hochladen
             <input type="file" id="modelFile" accept=".json" style="display:none">
           </label>
-          <div id="knnInfo" style="font-size:11px;color:var(--text3);margin-top:6px"></div>
-          <p style="font-size:11px;color:var(--text3)">Aus dem Python-Notebook exportieren. Das Modell kann k-NN und Baum gemeinsam enthalten.</p>
+          <div id="knnInfo" style="font-size:12px;color:var(--text3);margin-top:8px;line-height:1.6"></div>
+          <div id="knnError" style="display:none;font-size:12px;color:#f87171;margin-top:6px"></div>
+          <button class="btn" id="btnModelToggle" style="display:none;width:100%;margin-top:8px" onclick="toggleModel()">Modell aktivieren</button>
+          <p style="font-size:11px;color:var(--text3);margin-top:6px">Aus dem Python-Notebook exportieren. Das Modell kann k-NN und Baum gemeinsam enthalten.</p>
         </div>
 
         <!-- Objekt-Erkennung -->
@@ -466,6 +472,9 @@ let thrRows=[];
 let thrMode='peak';
 let thrWindowMs=loadStoredInt('cs_thr_window',200,20,3000);
 let lastPeakState={rp_min:0,l_min:0,delta_rp:0,delta_l:0,rp_avg:0,l_avg:0,n:0};
+let loadedModel=null;
+let modelActive=false;
+let espKnn=0, espTree=0;
 const INVERT=true;
 const G_ARC=180;
 
@@ -574,8 +583,21 @@ function tick(d,now){
     thrWindowMs=d.thrWin;
     thrWinInput.value=d.thrWin;
   }
-  if(d.knn!=null || d.tree!=null) $('knnStatus').textContent=(d.knn||0)+' k-NN Samples · '+(d.tree||0)+' Baumknoten';
-  if(d.pkLog!=null){ $('pkLogCount').textContent=d.pkLog+' / 80'; $('btnPkDl').disabled=(d.pkLog===0); }
+  if(d.knn!=null) espKnn=d.knn||0;
+  if(d.tree!=null) espTree=d.tree||0;
+  if(d.knn!=null || d.tree!=null){
+    if(!loadedModel) $('knnStatus').textContent=espKnn+' k-NN Samples · '+espTree+' Baumknoten';
+    if(!loadedModel && (espKnn>0||espTree>0)){
+      loadedModel=true;
+      modelActive=(d.mode===2||d.mode===3);
+      updateModelUI();
+    }
+  }
+  if(d.mode!=null){
+    modelActive=(d.mode===2||d.mode===3);
+    if(loadedModel) updateModelUI();
+  }
+  if(d.pkLog!=null){ $('pkLogCount').textContent=d.pkLog+' / 80'; }
   if(d.pkLogAct!=null){
     $('btnPkStart').disabled=!!d.pkLogAct;
     $('btnPkStop').disabled=!d.pkLogAct;
@@ -805,15 +827,100 @@ function clearThresholds(){
 window.clearThresholds=clearThresholds;
 
 // ── Modell-Upload ──
+function checkModel(json){
+  const errs=[];
+  const info=[];
+  let knnOk=false, treeOk=false;
+
+  if(json.knn && Array.isArray(json.knn.samples)){
+    const n=json.knn.samples.length;
+    const fc=json.knn.samples[0]&&json.knn.samples[0].x?json.knn.samples[0].x.length:0;
+    const classes=[...new Set(json.knn.samples.map(s=>s.name))];
+    if(fc!==6) errs.push('k-NN: erwartet 6 Features, gefunden '+fc);
+    else { info.push('k-NN: '+n+' Samples · '+classes.length+' Klassen ('+classes.join(', ')+')'); knnOk=true; }
+  }
+  if(json.tree && Array.isArray(json.tree.nodes)){
+    const n=json.tree.nodes.length;
+    const leaves=json.tree.nodes.filter(nd=>nd.feature===-1||nd.feature===null);
+    const classes=[...new Set(leaves.map(nd=>nd.label).filter(Boolean))];
+    info.push('Baum: '+n+' Knoten · '+classes.length+' Klassen ('+classes.join(', ')+')');
+    treeOk=true;
+  }
+  if(!json.knn && !json.tree) errs.push('Kein "knn" oder "tree" Objekt gefunden.');
+  return {errs, info, valid: errs.length===0 && (knnOk||treeOk)};
+}
+
+function updateModelUI(){
+  const btn=$('btnModelToggle');
+  if(!loadedModel||(!espKnn&&!espTree)){ btn.style.display='none'; return; }
+  btn.style.display='';
+  if(modelActive){
+    btn.textContent='Modell deaktivieren';
+    btn.classList.add('amber');
+    btn.classList.remove('primary');
+  } else {
+    btn.textContent='Modell aktivieren';
+    btn.classList.add('primary');
+    btn.classList.remove('amber');
+  }
+}
+
+function toggleModel(){
+  if(!loadedModel) return;
+  modelActive=!modelActive;
+  if(modelActive){
+    let m=null;
+    if(clsMode==='knn'&&espKnn>0) m='knn';
+    else if(clsMode==='tree'&&espTree>0) m='tree';
+    else if(espKnn>0) m='knn';
+    else if(espTree>0) m='tree';
+    if(!m){ modelActive=false; updateModelUI(); return; }
+    setClsMode(m);
+  } else {
+    setClsMode('manual');
+  }
+  updateModelUI();
+}
+window.toggleModel=toggleModel;
+
 $('modelFile').onchange=function(){
   const file=this.files[0]; if(!file) return;
-  $('knnStatus').textContent='Wird hochgeladen…';
-  const fd=new FormData(); fd.append('file',file);
-  const xhr=new XMLHttpRequest();
-  xhr.onload=()=>{
-    $('knnStatus').textContent=xhr.status===200?file.name+' ✓':'Fehler ('+xhr.status+')';
+  $('knnStatus').textContent='Wird geprüft…';
+  $('knnInfo').innerHTML='';
+  $('knnError').style.display='none';
+  $('knnError').textContent='';
+
+  const reader=new FileReader();
+  reader.onload=function(e){
+    let json;
+    try { json=JSON.parse(e.target.result); }
+    catch(ex){ $('knnStatus').textContent='Ungültiges JSON'; $('knnError').textContent='Parse-Fehler: '+ex.message; $('knnError').style.display=''; return; }
+
+    const {errs, info, valid}=checkModel(json);
+    $('knnInfo').innerHTML=info.map(l=>'✓ '+l).join('<br>');
+    if(errs.length){
+      $('knnError').textContent=errs.join(' / ');
+      $('knnError').style.display='';
+      $('knnStatus').textContent='Prüfung fehlgeschlagen';
+      loadedModel=null; modelActive=false; updateModelUI();
+      return;
+    }
+
+    $('knnStatus').textContent='Wird hochgeladen…';
+    const fd=new FormData(); fd.append('file',file);
+    const xhr=new XMLHttpRequest();
+    xhr.onload=()=>{
+      if(xhr.status===200){
+        $('knnStatus').textContent=file.name+' ✓';
+        loadedModel=json; modelActive=false; updateModelUI();
+      } else {
+        $('knnStatus').textContent='Upload-Fehler ('+xhr.status+')';
+        loadedModel=null; updateModelUI();
+      }
+    };
+    xhr.open('POST','/model'); xhr.send(fd);
   };
-  xhr.open('POST','/model'); xhr.send(fd);
+  reader.readAsText(file);
 };
 
 // ── Steuerung ──
@@ -854,10 +961,11 @@ $('btnDl').onclick=()=>{
 
 $('btnPkStart').onclick=()=>send('PEAK_LOG:start');
 $('btnPkStop').onclick=()=>send('PEAK_LOG:stop');
-$('btnPkClear').onclick=()=>{ if(confirm('Peak-Log löschen?')) send('PEAK_LOG:clear'); };
+$('btnPkClear').onclick=()=>{ if(confirm('Peak-Log löschen?')) { send('PEAK_LOG:clear'); $('pkFilename').value=''; } };
 $('btnPkDl').onclick=()=>{
   const host=location.hostname||'192.168.4.1';
-  Object.assign(document.createElement('a'),{href:'http://'+host+'/peaks.csv',download:'peaks_'+Date.now()+'.csv'}).click();
+  const name=($('pkFilename').value.trim().replace(/[^a-zA-Z0-9_\-]/g,'_')||'peaks');
+  Object.assign(document.createElement('a'),{href:'http://'+host+'/peaks.csv',download:name+'.csv'}).click();
 };
 
 // ── Chart ──

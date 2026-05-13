@@ -12,7 +12,7 @@
 #include <ArduinoJson.h>  // Bibliothek: "ArduinoJson" by Benoit Blanchon (v6)
 
 // ── Einstellungen ──
-static const char APP_VERSION[] = "v1.9";
+static const char APP_VERSION[] = "v2.3";
 int sendIntervalMs = 20;  // 20ms = 50 Hz
 
 // ── Pins ──
