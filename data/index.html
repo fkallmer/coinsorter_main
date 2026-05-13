@@ -1,0 +1,986 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>CoinSorter Lab</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f4f5f7;
+  --surface:#ffffff;
+  --surface2:#f0f1f3;
+  --border:#d8dce3;
+  --border2:#c2c8d3;
+  --text:#1a2030;
+  --text2:#4a5568;
+  --text3:#8896aa;
+  --blue:#1565c0;
+  --blue-l:#e3ecfa;
+  --blue-d:#0d47a1;
+  --green:#2e7d32;
+  --green-l:#e8f5e9;
+  --amber:#e65100;
+  --amber-l:#fff3e0;
+  --red:#c62828;
+  --red-l:#ffebee;
+  --rp:#1565c0;
+  --l:#7b1fa2;
+  --mono:'Menlo','Cascadia Code','Consolas','Courier New',monospace;
+  --sans:-apple-system,'Helvetica Neue',Arial,sans-serif;
+  --radius:6px;
+  --shadow:0 1px 3px rgba(0,0,0,.10),0 1px 2px rgba(0,0,0,.06);
+  --shadow-md:0 4px 6px rgba(0,0,0,.07),0 2px 4px rgba(0,0,0,.06);
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--sans);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+button,input,label,.btn,.tbtn,.tab-btn,.upload-lbl{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+
+/* ── Layout ── */
+.app{display:flex;flex-direction:column;min-height:100vh}
+
+/* ── Header ── */
+header{background:var(--blue);color:#fff;padding:0 20px;height:52px;display:flex;align-items:center;gap:16px;flex-shrink:0}
+.logo{font-size:15px;font-weight:600;letter-spacing:.02em;white-space:nowrap}
+.logo-sub{font-weight:400;opacity:.65;font-size:13px;margin-left:6px}
+.hgap{flex:1}
+.conn{display:flex;align-items:center;gap:8px}
+.led{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.3);flex-shrink:0;transition:all .3s}
+.led.on{background:#69f0ae;box-shadow:0 0 8px rgba(105,240,174,.7)}
+.conn-label{font-size:12px;font-weight:500;opacity:.85}
+.hz{font-size:12px;opacity:.6;font-family:var(--mono);min-width:64px}
+
+/* ── Content ── */
+.content{flex:1;padding:16px;display:flex;flex-direction:column;gap:12px;max-width:900px;margin:0 auto;width:100%}
+
+/* ── Cards ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+.card-header{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);background:var(--surface2);border-radius:var(--radius) var(--radius) 0 0}
+.card-title{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--text2)}
+.card-body{padding:14px}
+
+/* ── Metrics ── */
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.metric{padding:12px 14px;border-radius:var(--radius);border:1px solid var(--border)}
+.metric.rp{background:var(--blue-l);border-color:#b3caea}
+.metric.lv{background:#f3e5f5;border-color:#d7aaec}
+.metric-label{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;margin-bottom:4px}
+.metric.rp .metric-label{color:var(--blue-d)}
+.metric.lv .metric-label{color:#6a1b9a}
+.metric-val{font:700 28px/1 var(--mono);letter-spacing:-.01em}
+.metric.rp .metric-val{color:var(--rp)}
+.metric.lv .metric-val{color:var(--l)}
+.metric-unit{font-size:11px;color:var(--text3);margin-top:3px;font-family:var(--mono)}
+.ts{font-size:11px;color:var(--text3);text-align:right;margin-top:6px;font-family:var(--mono)}
+
+/* ── Chart ── */
+.chart-wrap{position:relative;height:200px;overflow:hidden;background:#fafbfc;border-top:1px solid var(--border)}
+canvas{position:absolute;inset:0;width:100%;height:100%}
+.chart-toolbar{display:flex;align-items:center;gap:8px;padding:7px 14px;border-top:1px solid var(--border);flex-wrap:wrap;background:var(--surface2)}
+.legend{display:flex;gap:12px}
+.leg{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:500;color:var(--text2)}
+.leg-dot{width:10px;height:3px;border-radius:2px;flex-shrink:0}
+.tgap{flex:1}
+.tbtn{padding:4px 10px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font:11px var(--sans);cursor:pointer;border-radius:4px;transition:all .12s;font-weight:500}
+.tbtn:hover{background:var(--surface2)}
+.tbtn.on{border-color:var(--blue);color:var(--blue);background:var(--blue-l)}
+.win-ctrl{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text3);font-family:var(--mono)}
+.pts{font-size:11px;color:var(--text3);font-family:var(--mono)}
+input[type=range].sm{-webkit-appearance:none;width:72px;height:3px;background:var(--border2);border-radius:2px;cursor:pointer}
+input[type=range].sm::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--blue);border:2px solid #fff;box-shadow:0 0 0 1px var(--border2)}
+
+/* ── Tabs ── */
+.tab-bar{display:flex;border-bottom:2px solid var(--border);background:var(--surface2);border-radius:var(--radius) var(--radius) 0 0;overflow:hidden}
+.tab-btn{
+  flex:1;padding:11px 8px;border:none;background:transparent;
+  font:12px/1 var(--sans);font-weight:600;cursor:pointer;
+  color:var(--text3);border-bottom:2px solid transparent;margin-bottom:-2px;
+  transition:all .15s;letter-spacing:.01em;
+}
+.tab-btn:hover{color:var(--text2);background:rgba(0,0,0,.03)}
+.tab-btn.active{color:var(--blue);border-bottom-color:var(--blue);background:var(--surface)}
+.tab-step{font-size:15px;margin-right:4px;opacity:.7}
+.tab-pane{display:none;flex-direction:column;gap:12px;padding:14px}
+.tab-pane.active{display:flex}
+
+/* ── Inputs / Buttons ── */
+input[type=range].ctrl{-webkit-appearance:none;width:100%;height:4px;background:var(--border2);border-radius:2px;cursor:pointer;outline:none;margin:4px 0}
+input[type=range].ctrl::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--blue);border:2px solid #fff;box-shadow:0 0 0 1px var(--blue),var(--shadow)}
+input[type=range].ctrl.amb::-webkit-slider-thumb{background:var(--amber);box-shadow:0 0 0 1px var(--amber),var(--shadow)}
+
+.row{display:flex;justify-content:space-between;align-items:center;font-size:12px;color:var(--text2);margin-bottom:5px}
+.row-val{font-family:var(--mono);font-weight:600;color:var(--text)}
+.section{display:flex;flex-direction:column;gap:5px}
+.section-title{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--text3);margin-bottom:2px}
+
+.btn-grid{display:grid;gap:5px}
+.btn-grid.c5{grid-template-columns:repeat(5,1fr)}
+.btn-grid.c3{grid-template-columns:repeat(3,1fr)}
+.btn-grid.c2{grid-template-columns:repeat(2,1fr)}
+.btn{display:flex;align-items:center;justify-content:center;gap:5px;padding:8px 6px;border:1px solid var(--border2);background:var(--surface);color:var(--text2);font:12px/1 var(--sans);cursor:pointer;border-radius:4px;transition:all .1s;font-weight:500}
+.btn:hover{background:var(--surface2);border-color:var(--blue);color:var(--blue)}
+.btn.primary{border-color:var(--blue);color:var(--blue);background:var(--blue-l)}
+.btn.primary:hover{background:#c9dcf5}
+.btn.amber{border-color:var(--amber);color:var(--amber);background:var(--amber-l)}
+.btn.amber:hover{background:#fde8c8}
+.btn.on{border-color:var(--blue);color:var(--blue);background:var(--blue-l)}
+.btn.rec-live{border-color:var(--red);color:var(--red);background:var(--red-l);animation:blink 1s step-end infinite}
+.btn:disabled{opacity:.35;cursor:default;pointer-events:none}
+.dot{width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0}
+@keyframes blink{50%{opacity:.4}}
+
+/* ── Servo ── */
+.servo-layout{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:start}
+svg.gauge{overflow:visible;display:block}
+.g-track{fill:none;stroke:var(--border2);stroke-width:7;stroke-linecap:round}
+.g-fill{fill:none;stroke:var(--blue);stroke-width:7;stroke-linecap:round;transition:stroke-dashoffset .1s}
+.g-tick{stroke:var(--border2);stroke-width:1.5}
+.g-tick-maj{stroke:var(--text3);stroke-width:1.5}
+.g-needle{fill:var(--blue)}
+.g-cap{fill:var(--surface2);stroke:var(--border2);stroke-width:2}
+.g-lbl{fill:var(--text3);font:10px var(--sans)}
+.angle-disp{font:700 40px/1 var(--mono);color:var(--text);letter-spacing:-.03em;margin:4px 0 8px}
+.angle-disp span{font-size:18px;color:var(--text3);font-weight:400}
+.servo-actions{display:grid;grid-template-columns:repeat(7,minmax(54px,1fr));gap:5px;margin-top:10px}
+
+/* ── Klassifikation ── */
+.cls-display{text-align:center;padding:14px;font:700 32px/1 var(--mono);color:var(--text3);border-radius:var(--radius);background:var(--surface2);border:1px solid var(--border);transition:all .25s}
+.cls-display.hit{background:var(--green-l);border-color:#81c784;color:var(--green)}
+.cls-display.miss{background:var(--amber-l);border-color:#ffb74d;color:var(--amber)}
+
+.thr-grid{display:grid;grid-template-columns:2.5fr 1.8fr 1.8fr 1.8fr 1.8fr 1.8fr auto;gap:4px;align-items:center;font-size:11px}
+.thr-grid input{width:100%;padding:4px 5px;border:1px solid var(--border2);border-radius:4px;font:11px var(--mono);background:var(--surface);color:var(--text);text-align:right}
+.thr-grid input[type=text]{text-align:left}
+.thr-hdr{color:var(--text3);font-size:10px;font-weight:600;letter-spacing:.05em;padding-bottom:2px}
+.thr-del{padding:3px 8px;font-size:11px;cursor:pointer;border:1px solid var(--red);color:var(--red);background:var(--red-l);border-radius:4px}
+.thr-del:hover{background:#ffcdd2}
+
+.num-row{display:flex;gap:8px;align-items:center}
+.num-row input{flex:1;padding:6px 8px;border:1px solid var(--border2);border-radius:4px;font:13px var(--mono);background:var(--surface);color:var(--text)}
+.field{display:flex;flex:1;flex-direction:column;gap:3px}
+.field label{font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text3)}
+.field input{width:100%;padding:6px 8px;border:1px solid var(--border2);border-radius:4px;font:13px var(--mono);background:var(--surface);color:var(--text)}
+.upload-lbl{display:block;text-align:center;padding:8px 14px;cursor:pointer;border:1px dashed var(--border2);border-radius:4px;color:var(--text3);font-size:12px;transition:all .12s}
+.upload-lbl:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-l)}
+
+/* ── Mobile ── */
+@media(max-width:600px){
+  header{padding:0 14px;height:48px}
+  .content{padding:10px;gap:10px}
+  .metrics{grid-template-columns:1fr 1fr}
+  .metric-val{font-size:22px}
+  .chart-wrap{height:160px}
+  .servo-layout{grid-template-columns:1fr;justify-items:center}
+  .angle-disp{font-size:32px;text-align:center}
+  .servo-actions{grid-template-columns:repeat(3,1fr);width:100%}
+  .tab-btn{padding:9px 4px;font-size:11px}
+  .tab-step{display:none}
+  .thr-grid{grid-template-columns:2fr 1.5fr 1.5fr 1.5fr 1.5fr 1.5fr auto}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo">CoinSorter<span class="logo-sub">Laborversuch</span></div>
+    <div class="hgap"></div>
+    <div class="conn">
+      <div class="led" id="led"></div>
+      <span class="conn-label" id="statusTxt">OFFLINE</span>
+      <span class="hz" id="hzVal"></span>
+    </div>
+  </header>
+
+  <div class="content">
+
+    <!-- Live-Sensor (immer sichtbar) -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">LDC1101 — Messwerte</span>
+        <div class="tgap"></div>
+        <span class="pts" id="pts">0 Messpunkte</span>
+      </div>
+      <div class="card-body">
+        <div class="metrics">
+          <div class="metric rp">
+            <div class="metric-label">RP — Parallelwiderstand</div>
+            <div class="metric-val" id="rpVal">——</div>
+            <div class="metric-unit">LSB</div>
+          </div>
+          <div class="metric lv">
+            <div class="metric-label">L — Induktivität</div>
+            <div class="metric-val" id="lVal">——</div>
+            <div class="metric-unit">LSB</div>
+          </div>
+        </div>
+        <div class="ts" id="tsEl"></div>
+      </div>
+      <div class="chart-wrap"><canvas id="chart"></canvas></div>
+      <div class="chart-toolbar">
+        <div class="legend">
+          <div class="leg"><div class="leg-dot" style="background:var(--rp)"></div>RP</div>
+          <div class="leg"><div class="leg-dot" style="background:var(--l)"></div>L</div>
+        </div>
+        <div class="tgap"></div>
+        <button class="tbtn" id="btnPause">&#x23F8; Pause</button>
+        <button class="tbtn" id="btnClear">&#x2715; Löschen</button>
+        <span style="color:var(--border2);margin:0 3px">|</span>
+        <button class="tbtn on" id="btnViewTime" onclick="setChartView('time')">Zeit</button>
+        <button class="tbtn"    id="btnViewScat" onclick="setChartView('scatter')">Streuung</button>
+        <span style="color:var(--border2);margin:0 3px">|</span>
+        <button class="tbtn on" id="btnWin" onclick="setChartMode('window')">Fenster</button>
+        <button class="tbtn"    id="btnAll" onclick="setChartMode('all')">Alles</button>
+        <div class="win-ctrl">
+          <input type="range" class="sm" id="winSlider" min="2" max="60" value="10"/>
+          <span id="winVal">10</span>s
+        </div>
+      </div>
+    </div>
+
+    <!-- Servo-Steuerung (immer sichtbar) -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Servo-Steuerung</span>
+      </div>
+      <div class="card-body">
+        <div class="servo-layout">
+          <svg class="gauge" width="180" height="105" viewBox="0 0 180 105">
+            <g id="ticks"></g>
+            <path class="g-track" d="M14 98 A80 80 0 0 1 166 98"/>
+            <path class="g-fill" id="gFill" d="M14 98 A80 80 0 0 1 166 98" pathLength="180" stroke-dasharray="180" stroke-dashoffset="180"/>
+            <text class="g-lbl" x="10"  y="107" text-anchor="middle">−90°</text>
+            <text class="g-lbl" x="90"  y="14"  text-anchor="middle">0°</text>
+            <text class="g-lbl" x="170" y="107" text-anchor="end">+90°</text>
+            <polygon id="needle" class="g-needle" points="90,98 88,86 90,20 92,86"/>
+            <circle cx="90" cy="98" r="6" class="g-cap"/>
+          </svg>
+          <div>
+            <div class="angle-disp" id="angleBig">0<span>°</span></div>
+            <input type="range" class="ctrl" id="servoSlider" min="-90" max="90" value="0"/>
+            <div class="servo-actions">
+              <button class="btn amber" onclick="setA(-90)">−90°</button>
+              <button class="btn" onclick="adj(-10)">−10°</button>
+              <button class="btn" onclick="adj(-1)">−1°</button>
+              <button class="btn primary" onclick="setA(0)">Neutral</button>
+              <button class="btn" onclick="adj(1)">+1°</button>
+              <button class="btn" onclick="adj(10)">+10°</button>
+              <button class="btn amber" onclick="setA(90)">+90°</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab-Container -->
+    <div class="card">
+      <div class="tab-bar">
+        <button class="tab-btn active" id="tab-btn-0" onclick="setTab(0)"><span class="tab-step">①</span>Sensor</button>
+        <button class="tab-btn"        id="tab-btn-1" onclick="setTab(1)"><span class="tab-step">②</span>Aufzeichnung</button>
+        <button class="tab-btn"        id="tab-btn-2" onclick="setTab(2)"><span class="tab-step">③</span>Sortierung</button>
+      </div>
+
+      <!-- Tab 0: Sensor kennenlernen -->
+      <div class="tab-pane active" id="tab-0">
+
+        <div class="section">
+          <div class="section-title">Verbindung</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button class="btn" id="btnRecon">&#x21bb; Verbinden</button>
+            <span style="font-size:12px;color:var(--text3)">Bei Verbindungsproblemen neu verbinden.</span>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Abtastrate</div>
+          <div class="row"><span>Frequenz</span><span class="row-val"><span id="freqVal">50</span> Hz</span></div>
+          <input type="range" class="ctrl" id="freqSlider" min="1" max="100" value="50"/>
+          <p style="font-size:11px;color:var(--text3);margin-top:4px">Höhere Rate → mehr Messpunkte, stärkere CPU-Last. Für Abschnitt 1: 50 Hz.</p>
+        </div>
+
+
+      </div>
+
+      <!-- Tab 1: Aufzeichnung -->
+      <div class="tab-pane" id="tab-1">
+
+        <div class="section">
+          <div class="section-title">Rohdaten-Aufzeichnung</div>
+          <div class="btn-grid c2">
+            <button class="btn" id="btnRec"><span class="dot"></span>Aufzeichnen</button>
+            <button class="btn" id="btnDl" disabled>&#x2B07; Export CSV</button>
+          </div>
+          <p style="font-size:11px;color:var(--text3);margin-top:6px">
+            Zeitreihe (Zeit_ms;RP;L). Pro Münzsorte aufzeichnen und benennen, z.&nbsp;B. <span style="font-family:var(--mono)">euro_10ct.csv</span>.
+          </p>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Peak-Feature-Export</div>
+          <div class="row"><span>Peaks erfasst</span><span class="row-val" id="pkLogCount">0 / 80</span></div>
+          <div class="btn-grid c3" style="margin-top:6px">
+            <button class="btn" id="btnPkStart">&#9679; Start</button>
+            <button class="btn" id="btnPkStop" disabled>&#9632; Stop</button>
+            <button class="btn" id="btnPkClear">&#x2715; Löschen</button>
+          </div>
+          <div style="margin-top:6px">
+            <button class="btn" id="btnPkDl" disabled style="width:100%">&#x2B07; Export peaks.csv</button>
+          </div>
+          <p style="font-size:11px;color:var(--text3);margin-top:6px">
+            Jeder erkannte Peak wird als eine Zeile gespeichert: label;rp_min;l_min;delta_rp;delta_l;rp_avg;l_avg.<br>
+            Workflow: Start → Münzsorte mehrfach durch den Kanal → Stop → Datei als <span style="font-family:var(--mono)">euro_10ct_peaks.csv</span> speichern → wiederholen.
+          </p>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Abtastrate</div>
+          <div class="row"><span>Frequenz</span><span class="row-val"><span id="freqVal2">50</span> Hz</span></div>
+          <input type="range" class="ctrl" id="freqSlider2" min="1" max="100" value="50"/>
+        </div>
+
+      </div>
+
+      <!-- Tab 2: Sortierung -->
+      <div class="tab-pane" id="tab-2">
+
+        <!-- Klassifikation -->
+        <div class="section">
+          <div class="section-title">Klassifikation</div>
+          <div class="btn-grid c5" style="margin-bottom:10px">
+            <button class="btn primary" id="btnModeM"   onclick="setClsMode('manual')">Manuell</button>
+            <button class="btn"         id="btnModeThr" onclick="setClsMode('threshold')">Schwellenwert</button>
+            <button class="btn"         id="btnModeKnn" onclick="setClsMode('knn')">k-NN</button>
+            <button class="btn"         id="btnModeTree" onclick="setClsMode('tree')">Baum</button>
+          </div>
+          <div class="cls-display" id="clsDisplay">—</div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">Letzter Peak</div>
+          <div class="metrics">
+            <div class="metric rp">
+              <div class="metric-label">RP min / mittel / delta</div>
+              <div class="metric-val" id="pkRpVal">——</div>
+              <div class="metric-unit" id="pkDRpVal">Ø — · Δ —</div>
+            </div>
+            <div class="metric lv">
+              <div class="metric-label">L min / mittel / delta</div>
+              <div class="metric-val" id="pkLVal">——</div>
+              <div class="metric-unit" id="pkDLVal">Ø — · Δ —</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Schwellenwert-Panel -->
+        <div id="thrPanel" class="section" style="display:none">
+          <div class="row">
+            <span class="section-title" style="margin:0">Klassen</span>
+            <button class="btn" onclick="clearThresholds()" style="padding:3px 8px;font-size:11px">Alle löschen</button>
+          </div>
+          <div class="btn-grid c3" style="margin-bottom:8px">
+            <button class="btn primary" id="btnThrPeak" onclick="setThrMode('peak')">Peak</button>
+            <button class="btn" id="btnThrAvg" onclick="setThrMode('avg')">Mittelwert</button>
+            <button class="btn" id="btnThrDelta" onclick="setThrMode('delta')">Delta</button>
+          </div>
+          <div class="num-row" style="margin-bottom:8px">
+            <input type="number" id="thrWinInput" value="200" min="20" max="3000" step="20">
+            <button class="btn" onclick="sendThrWindow()">Messfenster ms</button>
+          </div>
+          <div class="num-row" style="margin-bottom:8px">
+            <div class="field">
+              <label for="thrRpTolInput">Aus Messung: RP ±</label>
+              <input type="number" id="thrRpTolInput" value="250" min="1" max="5000" step="10">
+            </div>
+            <div class="field">
+              <label for="thrLTolInput">Aus Messung: L ±</label>
+              <input type="number" id="thrLTolInput" value="8" min="1" max="1000" step="1">
+            </div>
+          </div>
+          <div class="thr-grid" style="margin-bottom:4px">
+            <span class="thr-hdr">Name</span>
+            <span class="thr-hdr" id="thrRpMinHdr">RP Min</span>
+            <span class="thr-hdr" id="thrRpMaxHdr">RP Max</span>
+            <span class="thr-hdr" id="thrLMinHdr">L Min</span>
+            <span class="thr-hdr" id="thrLMaxHdr">L Max</span>
+            <span class="thr-hdr">Winkel°</span>
+            <span></span>
+          </div>
+          <div id="thrRows"></div>
+          <div class="btn-grid c3" style="margin-top:8px">
+            <button class="btn primary" onclick="addThrRow()">+ Klasse</button>
+            <button class="btn" onclick="addThrFromPeak()">Aus Messung</button>
+            <button class="btn amber"   onclick="sendThresholds()">Senden</button>
+          </div>
+          <p style="font-size:11px;color:var(--text3);margin-top:4px" id="thrModeHelp">Peak: Klassen prüfen RP min und L min im Messfenster. „Aus Messung“ setzt Grenzen als Messwert ± Toleranz.</p>
+        </div>
+
+        <!-- Modell-Panel -->
+        <div id="knnPanel" class="section" style="display:none">
+          <div class="row"><span class="section-title" style="margin:0">Modell</span><span style="font-size:11px;color:var(--text3)" id="knnStatus">Nicht geladen</span></div>
+          <label class="upload-lbl" for="modelFile">
+            model.json hochladen
+            <input type="file" id="modelFile" accept=".json" style="display:none">
+          </label>
+          <div id="knnInfo" style="font-size:11px;color:var(--text3);margin-top:6px"></div>
+          <p style="font-size:11px;color:var(--text3)">Aus dem Python-Notebook exportieren. Das Modell kann k-NN und Baum gemeinsam enthalten.</p>
+        </div>
+
+        <!-- Objekt-Erkennung -->
+        <div class="section">
+          <div class="section-title">Objekt-Erkennung (RP-Schwelle)</div>
+          <div class="num-row">
+            <input type="number" id="airThrInput" value="55000" min="1" max="65535">
+            <button class="btn" onclick="sendAirThr()">Setzen</button>
+          </div>
+          <p style="font-size:11px;color:var(--text3);margin-top:4px">Wenn RP unter diese Schwelle fällt, startet ein Peak. Ohne Objekt sollte RP darüber liegen.</p>
+        </div>
+
+        <!-- Servo-Kalibrierung -->
+        <div class="section">
+          <div class="section-title">Einbau-Kalibrierung</div>
+          <div class="row"><span>Nullpunkt (Einbaulage)</span><span style="font-size:11px;color:var(--text3)" id="npStatus">—</span></div>
+          <p style="font-size:11px;color:var(--text3);margin-bottom:8px">Servo zur gewünschten 0°-Position fahren, dann speichern.</p>
+          <div class="btn-grid c2">
+            <button class="btn amber" id="btnNpSave">Als Nullpunkt speichern</button>
+            <button class="btn"       id="btnNpReset">Zurücksetzen</button>
+          </div>
+        </div>
+
+      </div><!-- /tab-2 -->
+    </div><!-- /tab-container -->
+
+  </div><!-- /content -->
+</div><!-- /app -->
+
+<script>
+'use strict';
+
+// ── State ──
+let ws, paused=false, isRec=false;
+let recData=[], recUrl=null;
+let chartData=[], MAX=30000, chartMode='window', winSec=10, chartView='time';
+let msgCount=0, hzTimer=Date.now(), lastRx=0;
+let home=90, curRel=0;
+let clsMode='manual';
+let activeTab=0;
+let thrRows=[];
+let thrMode='peak';
+let thrWindowMs=loadStoredInt('cs_thr_window',200,20,3000);
+let lastPeakState={rp_min:0,l_min:0,delta_rp:0,delta_l:0,rp_avg:0,l_avg:0,n:0};
+const INVERT=true;
+const G_ARC=180;
+
+// ── DOM ──
+const $=id=>document.getElementById(id);
+const led=$('led'), statusTxt=$('statusTxt'), hzValEl=$('hzVal');
+const rpValEl=$('rpVal'), lValEl=$('lVal'), tsEl=$('tsEl'), ptsEl=$('pts');
+const servoSlider=$('servoSlider'), angleBig=$('angleBig');
+const needle=$('needle'), gFill=$('gFill');
+const canvas=$('chart'), ctx=canvas.getContext('2d');
+
+function loadStoredInt(key,fallback,min,max){
+  try{
+    const v=parseInt(localStorage.getItem(key)||fallback,10);
+    return Number.isFinite(v)?clamp(v,min,max):fallback;
+  }catch(e){ return fallback; }
+}
+
+// ── Tabs ──
+function setTab(i) {
+  activeTab=i;
+  [0,1,2].forEach(n=>{
+    $('tab-btn-'+n).classList.toggle('active', n===i);
+    $('tab-'+n).classList.toggle('active', n===i);
+  });
+  send(['SET_TAB:sensor','SET_TAB:record','SET_TAB:sort'][i]);
+}
+window.setTab=setTab;
+
+// ── Gauge-Ticks ──
+(()=>{
+  const g=$('ticks'), cx=90, cy=98, R=80, ri=74, riM=67;
+  for(let a=0;a<=180;a+=10){
+    const rad=(180-a)*Math.PI/180, cos=Math.cos(rad), sin=Math.sin(rad);
+    const maj=a%30===0;
+    const l=document.createElementNS('http://www.w3.org/2000/svg','line');
+    l.setAttribute('x1',(cx+R*cos).toFixed(2));
+    l.setAttribute('y1',(cy-R*sin).toFixed(2));
+    l.setAttribute('x2',(cx+(maj?riM:ri)*cos).toFixed(2));
+    l.setAttribute('y2',(cy-(maj?riM:ri)*sin).toFixed(2));
+    l.setAttribute('class',maj?'g-tick-maj':'g-tick');
+    g.appendChild(l);
+  }
+})();
+
+// ── Home / Nullpunkt ──
+function loadHome(){
+  try{ const v=parseInt(localStorage.getItem('cs_home')||'90',10); home=isNaN(v)?90:v; }catch(e){ home=90; }
+  updateNpStatus();
+}
+function updateNpStatus(){
+  const el=$('npStatus'); if(!el) return;
+  el.textContent=localStorage.getItem('cs_home')?'Servo '+home+'°':'—';
+}
+loadHome();
+$('thrWinInput').value=thrWindowMs;
+
+// ── WebSocket ──
+function connect(){
+  try{ws&&ws.close()}catch(e){}
+  statusTxt.textContent='Verbinden…'; led.classList.remove('on');
+  ws=new WebSocket('ws://'+location.hostname+':81/');
+  ws.onopen=()=>{ led.classList.add('on'); statusTxt.textContent='Verbunden'; sendHome(); send('SET_DISP:'+curRel); setTab(activeTab); setThrMode(thrMode); sendThrWindow(); };
+  ws.onclose=()=>{ led.classList.remove('on'); statusTxt.textContent='Getrennt'; hzValEl.textContent=''; setTimeout(connect,2000); };
+  ws.onmessage=e=>{
+    const now=Date.now(); lastRx=now; msgCount++;
+    const dt=now-hzTimer;
+    if(dt>=1000){ hzValEl.textContent=(msgCount*1000/dt).toFixed(1)+' Hz'; msgCount=0; hzTimer=now; }
+    let d; try{d=JSON.parse(e.data)}catch{return}
+    tick(d,now);
+  };
+}
+connect();
+
+function send(m){ if(ws&&ws.readyState===1) ws.send(m); }
+
+setInterval(()=>{
+  if(!lastRx) return;
+  if(Date.now()-lastRx>2000) statusTxt.textContent='Keine Daten';
+  else if(led.classList.contains('on')) statusTxt.textContent='Verbunden';
+},500);
+
+// ── Daten-Tick ──
+function clamp(v,lo,hi){ return Math.max(lo,Math.min(hi,v)); }
+
+function fmtAngle(rel){
+  const v=Math.round(rel);
+  return (v>0?'+':v<0?'':'')+v;
+}
+
+function setNeedle(rel){
+  const a=clamp(rel+90,0,180);
+  needle.setAttribute('transform',`rotate(${a-90},90,98)`);
+  gFill.style.strokeDashoffset=G_ARC-a;
+}
+
+function tick(d,now){
+  if(d.rp!=null) rpValEl.textContent=d.rp.toLocaleString('de-DE');
+  if(d.l!=null)  lValEl.textContent=d.l.toLocaleString('de-DE');
+  tsEl.textContent=new Date(now).toLocaleTimeString('de-DE');
+  if(d.class!=null) updateClsDisplay(d.class);
+  const airInput=$('airThrInput');
+  if(d.air!=null && document.activeElement!==airInput) airInput.value=d.air;
+  const thrWinInput=$('thrWinInput');
+  if(d.thrWin!=null && thrWinInput && document.activeElement!==thrWinInput){
+    thrWindowMs=d.thrWin;
+    thrWinInput.value=d.thrWin;
+  }
+  if(d.knn!=null || d.tree!=null) $('knnStatus').textContent=(d.knn||0)+' k-NN Samples · '+(d.tree||0)+' Baumknoten';
+  if(d.pkLog!=null){ $('pkLogCount').textContent=d.pkLog+' / 80'; $('btnPkDl').disabled=(d.pkLog===0); }
+  if(d.pkLogAct!=null){
+    $('btnPkStart').disabled=!!d.pkLogAct;
+    $('btnPkStop').disabled=!d.pkLogAct;
+    $('btnPkStart').classList.toggle('rec-live', !!d.pkLogAct);
+  }
+  if(d.peak){
+    lastPeakState=d.peak;
+    $('pkRpVal').textContent=(d.peak.rp_min||0).toLocaleString('de-DE');
+    $('pkLVal').textContent=(d.peak.l_min||0).toLocaleString('de-DE');
+    $('pkDRpVal').textContent='Ø '+(d.peak.rp_avg||0).toLocaleString('de-DE')+' · Δ '+(d.peak.delta_rp||0).toLocaleString('de-DE');
+    $('pkDLVal').textContent='Ø '+(d.peak.l_avg||0).toLocaleString('de-DE')+' · Δ '+(d.peak.delta_l||0).toLocaleString('de-DE');
+  }
+  const pt={t:now, rp:d.rp??0, l:d.l??0};
+  chartData.push(pt);
+  if(isRec) recData.push(pt);
+  if(chartData.length>MAX) chartData.shift();
+  ptsEl.textContent=chartData.length.toLocaleString('de-DE')+' Messpunkte';
+  if(!paused) schedDraw();
+}
+
+// ── Servo ──
+function sendAngle(rel){
+  rel=clamp(Math.round(rel),-90,90);
+  curRel=rel;
+  const raw=clamp(home+rel,0,180);
+  send('SET_ANG:'+(INVERT?180-raw:raw));
+  send('SET_DISP:'+rel);
+  angleBig.innerHTML=fmtAngle(rel)+'<span>°</span>';
+  servoSlider.value=rel;
+  setNeedle(rel);
+}
+function setA(v){ sendAngle(clamp(v,-90,90)); }
+function adj(d){ setA(curRel+d); }
+window.setA=setA; window.adj=adj;
+servoSlider.oninput=function(){ sendAngle(+this.value); };
+
+function sendHome(){
+  const raw=clamp(home,0,180);
+  send('SET_HOME:'+(INVERT?180-raw:raw));
+}
+
+// ── Frequenz (beide Slider synchronisieren) ──
+function syncFreq(hz, source){
+  $('freqVal').textContent=hz;
+  $('freqVal2').textContent=hz;
+  if(source!=='s1') $('freqSlider').value=hz;
+  if(source!=='s2') $('freqSlider2').value=hz;
+}
+$('freqSlider').oninput=function(){ syncFreq(this.value,'s1'); };
+$('freqSlider').onchange=function(){
+  send('SET_FREQ:'+this.value);
+  chartData=[]; ptsEl.textContent='0 Messpunkte';
+};
+$('freqSlider2').oninput=function(){ syncFreq(this.value,'s2'); };
+$('freqSlider2').onchange=function(){
+  send('SET_FREQ:'+this.value);
+  chartData=[]; ptsEl.textContent='0 Messpunkte';
+};
+
+// ── Nullpunkt ──
+$('btnNpSave').onclick=()=>{
+  home=clamp(home+curRel,0,180);
+  localStorage.setItem('cs_home',String(home));
+  curRel=0; servoSlider.value=0;
+  angleBig.innerHTML='0<span>°</span>'; setNeedle(0);
+  updateNpStatus();
+  sendHome();
+  const b=$('btnNpSave'); b.textContent='Gespeichert ✓';
+  setTimeout(()=>{ b.textContent='Als Nullpunkt speichern'; },2000);
+};
+$('btnNpReset').onclick=()=>{
+  home=90; localStorage.removeItem('cs_home'); updateNpStatus(); sendHome();
+};
+
+// ── Klassifikation ──
+function setClsMode(m){
+  clsMode=m;
+  send('SET_MODE:'+m);
+  ['M','Thr','Knn','Tree'].forEach(s=>$('btnMode'+s).classList.remove('primary'));
+  if(m==='manual')    $('btnModeM').classList.add('primary');
+  if(m==='threshold') $('btnModeThr').classList.add('primary');
+  if(m==='knn')       $('btnModeKnn').classList.add('primary');
+  if(m==='tree')      $('btnModeTree').classList.add('primary');
+  $('thrPanel').style.display=m==='threshold'?'':'none';
+  $('knnPanel').style.display=(m==='knn'||m==='tree')?'':'none';
+}
+window.setClsMode=setClsMode;
+
+function updateClsDisplay(cls){
+  const d=$('clsDisplay');
+  const air=cls==='Luft'||cls==='manuell'||cls==='?'||cls==='—';
+  const good=!air&&cls&&cls.length>0;
+  d.textContent=cls||'—';
+  d.className='cls-display'+(good?' hit':air?'':' miss');
+}
+
+function sendAirThr(){
+  const input=$('airThrInput');
+  const v=clamp(parseInt(input.value,10)||0,1,65535);
+  input.value=v;
+  input.blur();
+  send('SET_AIR:'+v);
+}
+window.sendAirThr=sendAirThr;
+
+// ── Threshold-Tabelle ──
+function setThrMode(mode){
+  thrMode=mode;
+  send('SET_THR_MODE:'+mode);
+  $('btnThrPeak').classList.toggle('primary',mode==='peak');
+  $('btnThrAvg').classList.toggle('primary',mode==='avg');
+  $('btnThrDelta').classList.toggle('primary',mode==='delta');
+  if(mode==='avg'){
+    $('thrRpMinHdr').textContent='RP Ø Min';
+    $('thrRpMaxHdr').textContent='RP Ø Max';
+    $('thrLMinHdr').textContent='L Ø Min';
+    $('thrLMaxHdr').textContent='L Ø Max';
+    $('thrModeHelp').textContent='Mittelwert: Klassen prüfen den Durchschnitt im Messfenster. „Aus Messung“ setzt Grenzen als Mittelwert ± Toleranz.';
+  } else if(mode==='delta'){
+    $('thrRpMinHdr').textContent='Δ RP Min';
+    $('thrRpMaxHdr').textContent='Δ RP Max';
+    $('thrLMinHdr').textContent='Δ L Min';
+    $('thrLMaxHdr').textContent='Δ L Max';
+    $('thrModeHelp').textContent='Delta: Klassen prüfen die Abweichung zur Luft-Referenz. „Aus Messung“ setzt Grenzen als Delta ± Toleranz.';
+  } else {
+    $('thrRpMinHdr').textContent='RP Min';
+    $('thrRpMaxHdr').textContent='RP Max';
+    $('thrLMinHdr').textContent='L Min';
+    $('thrLMaxHdr').textContent='L Max';
+    $('thrModeHelp').textContent='Peak: Klassen prüfen RP min und L min im Messfenster. „Aus Messung“ setzt Grenzen als Messwert ± Toleranz.';
+  }
+}
+window.setThrMode=setThrMode;
+
+function sendThrWindow(){
+  const input=$('thrWinInput');
+  if(!input) return;
+  thrWindowMs=clamp(parseInt(input.value,10)||200,20,3000);
+  input.value=thrWindowMs;
+  try{ localStorage.setItem('cs_thr_window',String(thrWindowMs)); }catch(e){}
+  input.blur();
+  send('SET_THR_WIN:'+thrWindowMs);
+}
+window.sendThrWindow=sendThrWindow;
+
+function addThrRow(name='',rpLo='',rpHi='',lLo='',lHi='',angle='0'){
+  const id=Date.now()+''+Math.random().toString(36).slice(2,5);
+  thrRows.push(id);
+  const d=document.createElement('div');
+  d.className='thr-grid'; d.id='tr_'+id; d.style.marginBottom='4px';
+  d.innerHTML=`
+    <input type="text"   placeholder="z.B. objekt_a"  id="tr_n_${id}"  value="${name}">
+    <input type="number" placeholder="0"           id="tr_r0_${id}" value="${rpLo}">
+    <input type="number" placeholder="65535"       id="tr_r1_${id}" value="${rpHi}">
+    <input type="number" placeholder="0"           id="tr_l0_${id}" value="${lLo}">
+    <input type="number" placeholder="65535"       id="tr_l1_${id}" value="${lHi}">
+    <input type="number" placeholder="0" min="-90" max="90" id="tr_a_${id}" value="${angle}">
+    <button class="thr-del" onclick="delThrRow('${id}')">✕</button>`;
+  $('thrRows').appendChild(d);
+}
+window.addThrRow=addThrRow;
+
+function delThrRow(id){
+  thrRows=thrRows.filter(r=>r!==id);
+  const el=$('tr_'+id); if(el) el.remove();
+}
+window.delThrRow=delThrRow;
+
+function addThrFromPeak(){
+  const p=lastPeakState;
+  if(!p || !p.rp_min || !p.l_min){
+    alert('Noch kein Peak vorhanden. Erst ein Objekt ueber den Sensor fuehren.');
+    return;
+  }
+  const rpVal=thrMode==='avg'?(p.rp_avg||p.rp_min):thrMode==='delta'?(p.delta_rp||0):p.rp_min;
+  const lVal=thrMode==='avg'?(p.l_avg||p.l_min):thrMode==='delta'?(p.delta_l||0):p.l_min;
+  if(!rpVal && !lVal){
+    alert('Der letzte Peak hat fuer diesen Modus noch keine nutzbaren Werte.');
+    return;
+  }
+  const rpTol=clamp(parseInt($('thrRpTolInput')?.value,10)||250,1,5000);
+  const lTol=clamp(parseInt($('thrLTolInput')?.value,10)||8,1,1000);
+  addThrRow(
+    'klasse_'+(thrRows.length+1),
+    clamp(rpVal-rpTol,0,65535),
+    clamp(rpVal+rpTol,0,65535),
+    clamp(lVal-lTol,0,65535),
+    clamp(lVal+lTol,0,65535),
+    curRel
+  );
+}
+window.addThrFromPeak=addThrFromPeak;
+
+function sendThresholds(){
+  const num=(id,fb)=>{ const v=parseInt($(id)?.value,10); return Number.isFinite(v)?v:fb; };
+  const rules=[];
+  for(const id of thrRows){
+    const name=($('tr_n_'+id)?.value||'').trim().replace(/:/g,'_').slice(0,15);
+    if(!name) continue;
+    const rpLo=clamp(num('tr_r0_'+id,0),0,65535);
+    const rpHi=clamp(num('tr_r1_'+id,65535),0,65535);
+    const lLo =clamp(num('tr_l0_'+id,0),0,65535);
+    const lHi =clamp(num('tr_l1_'+id,65535),0,65535);
+    const rel =clamp(num('tr_a_'+id,0),-90,90);
+    const raw =clamp(home+rel,0,180);
+    const abs =INVERT?180-raw:raw;
+    rules.push({
+      name, rpLo:Math.min(rpLo,rpHi), rpHi:Math.max(rpLo,rpHi),
+      lLo:Math.min(lLo,lHi), lHi:Math.max(lLo,lHi), abs
+    });
+  }
+  for(let i=0;i<rules.length;i++){
+    for(let j=i+1;j<rules.length;j++){
+      const a=rules[i], b=rules[j];
+      const overlaps=a.rpLo<=b.rpHi && b.rpLo<=a.rpHi && a.lLo<=b.lHi && b.lLo<=a.lHi;
+      if(overlaps && !confirm(`"${a.name}" und "${b.name}" ueberlappen. Erste passende Regel gewinnt. Trotzdem senden?`)) return;
+    }
+  }
+  send('CLR_THR');
+  for(const r of rules) send(`SET_THR:${r.name}:${r.rpLo}:${r.rpHi}:${r.lLo}:${r.lHi}:${r.abs}`);
+}
+window.sendThresholds=sendThresholds;
+
+function clearThresholds(){
+  send('CLR_THR'); thrRows=[]; $('thrRows').innerHTML='';
+}
+window.clearThresholds=clearThresholds;
+
+// ── Modell-Upload ──
+$('modelFile').onchange=function(){
+  const file=this.files[0]; if(!file) return;
+  $('knnStatus').textContent='Wird hochgeladen…';
+  const fd=new FormData(); fd.append('file',file);
+  const xhr=new XMLHttpRequest();
+  xhr.onload=()=>{
+    $('knnStatus').textContent=xhr.status===200?file.name+' ✓':'Fehler ('+xhr.status+')';
+  };
+  xhr.open('POST','/model'); xhr.send(fd);
+};
+
+// ── Steuerung ──
+$('btnRecon').onclick=connect;
+$('btnPause').onclick=()=>{
+  paused=!paused;
+  $('btnPause').classList.toggle('on',paused);
+  $('btnPause').textContent=paused?'▶ Weiter':'⏸ Pause';
+  if(!paused) schedDraw();
+};
+$('btnClear').onclick=()=>{ chartData=[]; ptsEl.textContent='0 Messpunkte'; if(!paused) schedDraw(); };
+
+$('btnRec').onclick=()=>{
+  if(isRec){
+    isRec=false;
+    const snap=[...recData]; recData=[];
+    if(snap.length) buildCsv(snap);
+    $('btnRec').innerHTML='<span class="dot"></span>Aufzeichnen';
+    $('btnRec').classList.remove('rec-live');
+  } else {
+    isRec=true; recData=[]; $('btnDl').disabled=true;
+    $('btnRec').innerHTML='<span class="dot"></span>Stopp';
+    $('btnRec').classList.add('rec-live');
+  }
+};
+
+function buildCsv(data){
+  let s='Zeit_ms;RP;L\n'; const t0=data[0].t;
+  for(const r of data) s+=`${r.t-t0};${r.rp};${r.l}\n`;
+  if(recUrl) URL.revokeObjectURL(recUrl);
+  recUrl=URL.createObjectURL(new Blob([s],{type:'text/csv;charset=utf-8'}));
+  $('btnDl').disabled=false;
+}
+$('btnDl').onclick=()=>{
+  if(!recUrl) return;
+  Object.assign(document.createElement('a'),{href:recUrl,download:'messung_'+Date.now()+'.csv'}).click();
+};
+
+$('btnPkStart').onclick=()=>send('PEAK_LOG:start');
+$('btnPkStop').onclick=()=>send('PEAK_LOG:stop');
+$('btnPkClear').onclick=()=>{ if(confirm('Peak-Log löschen?')) send('PEAK_LOG:clear'); };
+$('btnPkDl').onclick=()=>{
+  const host=location.hostname||'192.168.4.1';
+  Object.assign(document.createElement('a'),{href:'http://'+host+'/peaks.csv',download:'peaks_'+Date.now()+'.csv'}).click();
+};
+
+// ── Chart ──
+function setChartMode(m){
+  chartMode=m;
+  $('btnWin').classList.toggle('on',m==='window');
+  $('btnAll').classList.toggle('on',m==='all');
+  if(!paused) schedDraw();
+}
+window.setChartMode=setChartMode;
+
+function setChartView(v){
+  chartView=v;
+  $('btnViewTime').classList.toggle('on',v==='time');
+  $('btnViewScat').classList.toggle('on',v==='scatter');
+  if(!paused) schedDraw();
+}
+window.setChartView=setChartView;
+$('winSlider').oninput=function(){ winSec=+this.value; $('winVal').textContent=winSec; if(!paused) schedDraw(); };
+
+const COL={rp:'#1565c0',l:'#7b1fa2',grid:'rgba(0,0,0,.06)'};
+let drawing=false;
+function schedDraw(){ if(drawing) return; drawing=true; requestAnimationFrame(()=>{ draw(); drawing=false; }); }
+
+function draw(){
+  const W=canvas.parentElement.clientWidth, H=canvas.parentElement.clientHeight;
+  const dpr=Math.max(1,devicePixelRatio||1);
+  if(canvas.width!==W*dpr||canvas.height!==H*dpr){
+    canvas.width=W*dpr; canvas.height=H*dpr;
+    canvas.style.width=W+'px'; canvas.style.height=H+'px';
+  }
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  const PL=52, PR=48, PT=4, PB=20;
+  const pw=W-PL-PR, ph=H-PT-PB;
+  ctx.fillStyle='#fafbfc'; ctx.fillRect(0,0,W,H);
+  ctx.strokeStyle=COL.grid; ctx.lineWidth=1;
+  for(let i=1;i<10;i++){ const x=PL+pw/10*i; ctx.beginPath(); ctx.moveTo(x,PT); ctx.lineTo(x,PT+ph); ctx.stroke(); }
+  for(let i=1;i<5;i++){  const y=PT+ph/5*i;  ctx.beginPath(); ctx.moveTo(PL,y); ctx.lineTo(PL+pw,y); ctx.stroke(); }
+  if(chartData.length<2) return;
+  let startT,endT;
+  if(chartMode==='window'){ endT=chartData[chartData.length-1].t; startT=endT-winSec*1000; }
+  else{ startT=chartData[0].t; endT=chartData[chartData.length-1].t; }
+  if(endT<=startT) return;
+  const vis=chartMode==='window'
+    ?(()=>{ let i=chartData.length-1; while(i>0&&chartData[i-1].t>=startT) i--; return chartData.slice(i); })()
+    :chartData;
+  if(vis.length<2) return;
+  const expand=(lo,hi)=>{ const d=Math.max((hi-lo)*.15,400); return [lo-d,hi+d]; };
+  const fmtV=v=>Math.abs(v)>=1000?Math.round(v/1000)+'k':String(Math.round(v));
+  ctx.font='9px Menlo,monospace'; ctx.textBaseline='middle';
+
+  if(chartView==='scatter'){
+    // ── Streudiagramm: x=RP, y=L ──
+    let rLo=Infinity,rHi=-Infinity,lLo=Infinity,lHi=-Infinity;
+    for(const p of vis){
+      if(p.rp<rLo)rLo=p.rp; if(p.rp>rHi)rHi=p.rp;
+      if(p.l<lLo)lLo=p.l;   if(p.l>lHi)lHi=p.l;
+    }
+    // Enger Rand (kein 400er-Minimum — L hat oft nur ±10 Varianz)
+    const expandT=(lo,hi)=>{ const d=Math.max((hi-lo)*.2,1); return [lo-d,hi+d]; };
+    [rLo,rHi]=expandT(rLo,rHi); [lLo,lHi]=expandT(lLo,lHi);
+    const xS=v=>PL+((v-rLo)/(rHi-rLo))*pw;
+    const yS=v=>PT+ph-((v-lLo)/(lHi-lLo))*ph;
+    const n=vis.length, step=Math.max(1,Math.floor(n/2000));
+    ctx.save(); ctx.beginPath(); ctx.rect(PL,PT,pw,ph); ctx.clip();
+    for(let i=0;i<n;i+=step){
+      const p=vis[i];
+      const alpha=(0.15+0.65*(i/n)).toFixed(2);
+      ctx.fillStyle=`rgba(21,101,192,${alpha})`;
+      ctx.fillRect(xS(p.rp)-1.5,yS(p.l)-1.5,3,3);
+    }
+    ctx.restore();
+    ctx.fillStyle=COL.rp; ctx.textAlign='center';
+    [0,.25,.5,.75,1].forEach(f=>{ const v=rLo+f*(rHi-rLo); ctx.fillText(fmtV(v),xS(v),PT+ph+12); });
+    ctx.fillStyle=COL.l; ctx.textAlign='right';
+    [0,.25,.5,.75,1].forEach(f=>{ const v=lLo+f*(lHi-lLo); ctx.fillText(fmtV(v),PL-3,yS(v)); });
+    ctx.fillStyle=COL.rp; ctx.textAlign='right'; ctx.font='bold 9px Menlo,monospace';
+    ctx.fillText('RP',PL+pw,PT+ph+12);
+    ctx.fillStyle=COL.l;
+    ctx.save(); ctx.translate(10,PT+4); ctx.rotate(-Math.PI/2);
+    ctx.textAlign='right'; ctx.fillText('L',0,0); ctx.restore();
+  } else {
+    // ── Zeitverlauf ──
+    let rLo=Infinity,rHi=-Infinity,lLo=Infinity,lHi=-Infinity;
+    for(const p of vis){
+      if(p.rp<rLo)rLo=p.rp; if(p.rp>rHi)rHi=p.rp;
+      if(p.l<lLo)lLo=p.l;   if(p.l>lHi)lHi=p.l;
+    }
+    const expandL=(lo,hi)=>{ const d=Math.max((hi-lo)*.2,2); return [lo-d,hi+d]; };
+    [rLo,rHi]=expand(rLo,rHi); [lLo,lHi]=expandL(lLo,lHi);
+    const xM=t=>PL+((t-startT)/(endT-startT))*pw;
+    const rM=v=>PT+ph-((v-rLo)/(rHi-rLo))*ph;
+    const lM=v=>PT+ph-((v-lLo)/(lHi-lLo))*ph;
+    ctx.save(); ctx.beginPath(); ctx.rect(PL,PT,pw,ph); ctx.clip();
+    function trace(key,mapY,col){
+      ctx.beginPath();
+      for(let i=0;i<vis.length;i++){
+        const x=xM(vis[i].t), y=mapY(vis[i][key]);
+        i?ctx.lineTo(x,y):ctx.moveTo(x,y);
+      }
+      ctx.strokeStyle=col; ctx.lineWidth=1.5; ctx.lineJoin='round'; ctx.stroke();
+    }
+    trace('rp',rM,COL.rp);
+    trace('l',lM,COL.l);
+    ctx.restore();
+    const steps=[0,.25,.5,.75,1];
+    ctx.fillStyle=COL.rp; ctx.textAlign='right';
+    for(const f of steps){ const v=rLo+f*(rHi-rLo),y=rM(v); if(y>=PT-2&&y<=PT+ph+2) ctx.fillText(fmtV(v),PL-3,y); }
+    ctx.fillStyle=COL.l; ctx.textAlign='left';
+    for(const f of steps){ const v=lLo+f*(lHi-lLo),y=lM(v); if(y>=PT-2&&y<=PT+ph+2) ctx.fillText(fmtV(v),PL+pw+3,y); }
+    ctx.fillStyle='rgba(0,0,0,.38)'; ctx.textAlign='center';
+    const totalSec=(endT-startT)/1000;
+    const nX=Math.min(5,Math.max(2,Math.floor(pw/55)));
+    for(let i=0;i<=nX;i++){
+      const f=i/nX, x=PL+f*pw;
+      const s=chartMode==='window'?(f*totalSec-totalSec).toFixed(0)+'s':(f*totalSec).toFixed(0)+'s';
+      ctx.fillText(s,x,PT+ph+12);
+    }
+  }
+}
+
+window.addEventListener('resize',()=>{ if(!paused) schedDraw(); });
+schedDraw();
+</script>
+</body>
+</html>
